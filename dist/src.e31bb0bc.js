@@ -35429,7 +35429,7 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.DECK = exports.SET_INSTRUCTIONS_EXPANDED = exports.SET_GAME_STARTED = void 0;
+exports.DECK_DRAW = exports.DECK = exports.SET_INSTRUCTIONS_EXPANDED = exports.SET_GAME_STARTED = void 0;
 var SET_GAME_STARTED = 'SET_GAME_STARTED';
 exports.SET_GAME_STARTED = SET_GAME_STARTED;
 var SET_INSTRUCTIONS_EXPANDED = 'SET_INSTRUCTIONS_EXPANDED'; // export const FETCH_DECK_RESULT = 'FETCH_DECK_RESULT';
@@ -35441,6 +35441,11 @@ var DECK = {
   FETCH_ERROR: 'DECK_FETCH_ERROR'
 };
 exports.DECK = DECK;
+var DECK_DRAW = {
+  FETCH_SUCCESS: 'DECK_DRAW_FETCH_SUCCESS',
+  FETCH_ERROR: 'DECK_DRAW_FETCH_ERROR'
+};
+exports.DECK_DRAW = DECK_DRAW;
 },{}],"reducers/settings.js":[function(require,module,exports) {
 "use strict";
 
@@ -35516,17 +35521,19 @@ var DEFAULT_DECK = {
   deck_id: '',
   remaining: 0,
   fetchState: '',
-  message: ''
+  message: '',
+  cards: []
 };
 
 var deckReducer = function deckReducer() {
   var state = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : DEFAULT_DECK;
   var action = arguments.length > 1 ? arguments[1] : undefined;
+  var remaining, deck_id, cards;
 
   switch (action.type) {
     case _types.DECK.FETCH_SUCCESS:
-      var remaining = action.remaining,
-          deck_id = action.deck_id;
+      remaining = action.remaining;
+      deck_id = action.deck_id;
       return _objectSpread({}, state, {
         remaining: remaining,
         deck_id: deck_id,
@@ -35534,6 +35541,21 @@ var deckReducer = function deckReducer() {
       });
 
     case _types.DECK.FETCH_ERROR:
+      return _objectSpread({}, state, {
+        message: action.message,
+        fetchState: _fetchStates.default.error
+      });
+
+    case _types.DECK_DRAW.FETCH_SUCCESS:
+      remaining = action.remaining;
+      cards = action.cards;
+      return _objectSpread({}, state, {
+        remaining: remaining,
+        cards: cards,
+        fetchState: _fetchStates.default.success
+      });
+
+    case _types.DECK_DRAW.FETCH_ERROR:
       return _objectSpread({}, state, {
         message: action.message,
         fetchState: _fetchStates.default.error
@@ -35619,9 +35641,11 @@ exports.collapseInstructions = collapseInstructions;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.fetchNewDeck = exports.fetchDeckError = exports.fetchDeckSuccess = void 0;
+exports.fetchDrawCard = exports.fetchNewDeck = exports.fetchDeckError = exports.fetchDeckSuccess = void 0;
 
 var _types = require("./types");
+
+var API_ADDRESS = 'https://deck-of-cards-api-wrapper.appspot.com';
 
 var fetchDeckSuccess = function fetchDeckSuccess(deckJson) {
   var remaining = deckJson.remaining,
@@ -35646,7 +35670,7 @@ exports.fetchDeckError = fetchDeckError;
 
 var fetchNewDeck = function fetchNewDeck() {
   return function (dispatch) {
-    fetch('https://deck-of-cards-api-wrapper.appspot.com/deck/new/shuffle').then(function (response) {
+    fetch("".concat(API_ADDRESS, "/deck/new/shuffle")).then(function (response) {
       if (response.status !== 200) {
         throw new Error('Unsuccessful request to deckofcardsapi.com.');
       }
@@ -35661,6 +35685,31 @@ var fetchNewDeck = function fetchNewDeck() {
 };
 
 exports.fetchNewDeck = fetchNewDeck;
+
+var fetchDrawCard = function fetchDrawCard(deck_id) {
+  return function (dispatch) {
+    return fetch("".concat(API_ADDRESS, "/deck/").concat(deck_id, "/draw")).then(function (response) {
+      if (response.status !== 200) {
+        throw new Error('Unsuccessful request to deckofcardsapi.com');
+      }
+
+      return response.json();
+    }).then(function (json) {
+      dispatch({
+        type: _types.DECK_DRAW.FETCH_SUCCESS,
+        cards: json.cards,
+        remaining: json.remaining
+      });
+    }).catch(function (error) {
+      return dispatch({
+        type: _types.DECK_DRAW.FETCH_ERROR,
+        message: error.message
+      });
+    });
+  };
+};
+
+exports.fetchDrawCard = fetchDrawCard;
 },{"./types":"actions/types.js"}],"components/instructions.js":[function(require,module,exports) {
 "use strict";
 
@@ -35729,22 +35778,37 @@ var _react = _interopRequireDefault(require("react"));
 
 var _reactRedux = require("react-redux");
 
+var _deck = require("../actions/deck");
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var DrawCard = function DrawCard(props) {
-  console.log('DrawCard props', props);
-  return _react.default.createElement("div", null, _react.default.createElement("button", null, "Draw the next card"));
+var DrawCard = function DrawCard(_ref) {
+  var deck_id = _ref.deck_id,
+      fetchDrawCard = _ref.fetchDrawCard;
+  return _react.default.createElement("div", null, _react.default.createElement("button", {
+    onClick: fetchDrawCard(deck_id)
+  }, "Draw the next card"));
 };
 
-var _default = (0, _reactRedux.connect)(function (_ref) {
-  var deck_id = _ref.deck.deck_id;
+var mapDispatchToProps = function mapDispatchToProps(dispatch) {
+  return {
+    fetchDrawCard: function fetchDrawCard(deck_id) {
+      return function () {
+        return dispatch((0, _deck.fetchDrawCard)(deck_id));
+      };
+    }
+  };
+};
+
+var _default = (0, _reactRedux.connect)(function (_ref2) {
+  var deck_id = _ref2.deck.deck_id;
   return {
     deck_id: deck_id
   };
-})(DrawCard);
+}, mapDispatchToProps)(DrawCard);
 
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js"}],"components/App.js":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","react-redux":"../node_modules/react-redux/es/index.js","../actions/deck":"actions/deck.js"}],"components/App.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -36002,7 +36066,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "52819" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "61730" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
